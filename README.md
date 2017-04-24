@@ -1,5 +1,5 @@
-# Self-Driving Car Engineer Nanodegree Program
-## Advanced Lane Finding Project
+# CarND-Advanced-Lane-Lines
+My submission for the Udacity Self-Driving Car Nanodegree program Project 4 - Advanced Lane Lines Detection
 
 The goals / steps of this project are the following:
 
@@ -11,6 +11,7 @@ The goals / steps of this project are the following:
 * Determine the curvature of the lane and vehicle position with respect to center.
 * Warp the detected lane boundaries back onto the original image.
 * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
+* Run the pipeline on a video with the output superimposed on the video.
 
 [//]: # (Image References)
 
@@ -34,63 +35,54 @@ The goals / steps of this project are the following:
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 *Here I will consider the rubric points individually and describe how I addressed each point in my implementation.*
 
----
-### Writeup / README
-
-#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  [Here](https://github.com/udacity/CarND-Advanced-Lane-Lines/blob/master/writeup_template.md) is a template writeup for this project you can use as a guide and a starting point.  
-
-You're reading it!
 
 ### Camera Calibration
 
 #### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
+This is the first step of the project under the heading, "Compute the camera calibration using chessboard images"
+A number of images of a chessboard taken with the same camera from different angles, is given as input. OpenCV's findChessboardCorners function is used to obtain the internal corners on the input images. These image points along with actual indices of the chessboard's internal corners, are fed to OpenCV's calibrateCamera function which returns camera calibration and distortion coefficients. 
+Once calculated, these camera calibration and distortion coefficients can then be used by OpenCV's undistort function to undistort any image taken by the same camera.
 
-The code for this step is contained in the first two code cells of the Jupyter notebook `project.ipynb`.  
-
-The OpenCV functions `findChessboardCorners` and `calibrateCamera` are the backbone of the image calibration. A number of images of a chessboard, taken from different angles with the same camera, comprise the input. Arrays of object points, corresponding to the location (essentially indices) of internal corners of a chessboard, and image points, the pixel locations of the internal chessboard corners determined by `findChessboardCorners`, are fed to `calibrateCamera` which returns camera calibration and distortion coefficients. These can then be used by the OpenCV `undistort` function to undo the effects of distortion on any image produced by the same camera. Generally, these coefficients will not change for a given camera (and lens). The below image depicts the corners drawn onto twenty chessboard images using the OpenCV function `drawChessboardCorners`:
-
-![alt text][im01]
-
-*Note: Some of the chessboard images don't appear because `findChessboardCorners` was unable to detect the desired number of internal corners.*
-
-The image below depicts the results of applying `undistort`, using the calibration and distortion coefficients, to one of the chessboard images:
+The image below is an example of a raw calibration image and its undistorted version:
 
 ![alt text][im02]
 
-### Pipeline (single images)
+### Pipeline (test images)
 
 #### 1. Provide an example of a distortion-corrected image.
 
-The image below depicts the results of applying `undistort` to one of the project dashcam images:
+The image below shows the results of applying distortion correction on one of the test images.
 
 ![alt text][im03]
 
-The effect of `undistort` is subtle, but can be perceived from the difference in shape of the hood of the car at the bottom corners of the image.
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
-I explored several combinations of sobel gradient thresholds and color channel thresholds in multiple color spaces. These are labeled clearly in the Jupyter notebook. Below is an example of the combination of sobel magnitude and direction thresholds:
-
-![alt text][im06]
+The code for this can be found after the perspective transform in the project.ipynb
+It made more sense to form a binary image after perspective transform.
 
 The below image shows the various channels of three different color spaces for the same image:
 
 ![alt text][im05]
 
-Ultimately, I chose to use just the L channel of the HLS color space to isolate white lines and the B channel of the LAB colorspace to isolate yellow lines. I did not use any gradient thresholds in my pipeline. I did, however finely tune the threshold for each channel to be minimally tolerant to changes in lighting. As part of this, I chose to normalize the maximum values of the HLS L channel and the LAB B channel (presumably occupied by lane lines) to 255, since the values the lane lines span in these channels can vary depending on lighting conditions. Below are examples of thresholds in the HLS L channel and the LAB B channel:
+The primary project video consists of standard white and yellow lines. As seen from the course lecture, quizes, Udacity forum discussions and in the image above, the HLS L channel does a good job in isolating white lines and the LAB B channel does a good job in isolation yellow lines.
+To keep the pipeline simple, I chose to use just these in my code and finetuned the thresholds to work well with all test images. 
+The maximum value of each channels were normalized to 255 to work well in different lighting conditions. To get rid of noise, the B channel was not normalized if the maximum value for an image was less than 175, signifying that there was no actual yellow line in the image. 
+
+Below are examples of thresholds in the HLS L channel and the LAB B channel:
 
 ![alt text][im07]
 ![alt text][im08]
 
-*Note: the B channel was not normalized if the maximum value for an image was less than 175, signifying that there was no yellow actually in the image. Otherwise the resulting thresholded binary image was very noisy.*
 
-Below are the results of applying the binary thresholding pipeline to various sample images:
+Below are the binary images for all the corresponding test images after applying a combination of HLS L Channel and LAB B Channel thresholding:
 
 ![alt text][im09]
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-The code for my perspective transform is titled "Perspective Transform" in the Jupyter notebook, in the seventh and eighth code cells from the top.  The `unwarp()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose to hardcode the source and destination points in the following manner:
+The code for my perspective transform is titled "Perspective Transform" in the Jupyter notebook.
+The `unwarp()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  Since the project video is seemingly without elevation, I chose to hardcode the source and destination points in the following manner:
 
 ```
 src = np.float32([(575,464),
@@ -102,27 +94,30 @@ dst = np.float32([(450,0),
                   (450,h),
                   (w-450,h)])
 ```
-I had considered programmatically determining source and destination points, but I felt that I would get better results carefully selecting points using one of the `straight_lines` test images for reference and assuming that the camera position will remain constant and that the road in the videos will remain relatively flat. The image below demonstrates the results of the perspective transform: 
+
+The image below demonstrates the results of the perspective transform: 
 
 ![alt text][im04]
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-The functions `sliding_window_polyfit` and `polyfit_using_prev_fit`, which identify lane lines and fit a second order polynomial to both right and left lane lines, are clearly labeled in the Jupyter notebook as "Sliding Window Polyfit" and "Polyfit Using Fit from Previous Frame". The first of these computes a histogram of the bottom half of the image and finds the bottom-most x position (or "base") of the left and right lane lines. Originally these locations were identified from the local maxima of the left and right halves of the histogram, but in my final implementation I changed these to quarters of the histogram just left and right of the midpoint. This helped to reject lines from adjacent lanes. The function then identifies ten windows from which to identify lane pixels, each one centered on the midpoint of the pixels from the window below. This effectively "follows" the lane lines up to the top of the binary image, and speeds processing by only searching for activated pixels over a small portion of the image. Pixels belonging to each lane line are identified and the Numpy `polyfit()` method fits a second order polynomial to each set of pixels. The image below demonstrates how this process works:
+The functions `sliding_window_polyfit` under the heading "Sliding Window Polyfit" and `polyfit_using_prev_fit` under the heading "Polyfit Using Fit from Previous Frame" in the code, identify lane lines and fit a second order polynomial to both right and left lane lines. 
 
+The sliding_window_polyfit computes a histogram of the bottom half of the image and finds the base of the left and right lane lines. The right lane and left lane is identified just left and right of the midpoint. This helped to reject lines from other lanes. 
+The function then identifies ten windows from which to identify lane pixels, each one centered on the midpoint of the pixels from the window below. This effectively "follows" the lane lines up to the top of the binary image, and speeds processing by only searching for activated pixels over a small portion of the image. Pixels belonging to each lane line are identified and the Numpy `polyfit()` method fits a second order polynomial to each set of pixels. The image below demonstrates how this process works:
 ![alt text][im10]
 
 The image below depicts the histogram generated by `sliding_window_polyfit`; the resulting base points for the left and right lanes - the two peaks nearest the center - are clearly visible:
 
 ![alt text][im11]
 
-The `polyfit_using_prev_fit` function performs basically the same task, but alleviates much difficulty of the search process by leveraging a previous fit (from a previous video frame, for example) and only searching for lane pixels within a certain range of that fit. The image below demonstrates this - the green shaded area is the range from the previous fit, and the yellow lines and red and blue pixels are from the current image:
+The `polyfit_using_prev_fit` leverages a previous fit (from a previous video frame, for example) and only searches for lane pixels within a certain range of that fit. The image below demonstrates this - the green shaded area is the range from the previous fit, and the yellow lines and red and blue pixels are from the current image:
 
 ![alt text][im12]
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-The radius of curvature is based upon [this website](http://www.intmath.com/applications-differentiation/8-radius-curvature.php) and calculated in the code cell titled "Radius of Curvature and Distance from Lane Center Calculation" using this line of code (altered for clarity):
+The radius of curvature is calculated in the code cell titled "Radius of Curvature and Distance from Lane Center Calculation" using this line of code:
 ```
 curve_radius = ((1 + (2*fit[0]*y_0*y_meters_per_pixel + fit[1])**2)**1.5) / np.absolute(2*fit[0])
 ```
@@ -133,11 +128,11 @@ The position of the vehicle with respect to the center of the lane is calculated
 lane_center_position = (r_fit_x_int + l_fit_x_int) /2
 center_dist = (car_position - lane_center_position) * x_meters_per_pix
 ```
-`r_fit_x_int` and `l_fit_x_int` are the x-intercepts of the right and left fits, respectively. This requires evaluating the fit at the maximum y value (719, in this case - the bottom of the image) because the minimum y value is actually at the top (otherwise, the constant coefficient of each fit would have sufficed). The car position is the difference between these intercept points and the image midpoint (assuming that the camera is mounted at the center of the vehicle).
+`r_fit_x_int` and `l_fit_x_int` are the x-intercepts of the right and left fits, respectively. The car position is the difference between these intercept points and the image midpoint.
 
 #### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in the code cells titled "Draw the Detected Lane Back onto the Original Image" and "Draw Curvature Radius and Distance from Center Data onto the Original Image" in the Jupyter notebook. A polygon is generated based on plots of the left and right fits, warped back to the perspective of the original image using the inverse perspective matrix `Minv` and overlaid onto the original image. The image below is an example of the results of the `draw_lane` function:
+You can find this code in the section titled "Draw the Detected Lane Back onto the Original Image" and "Draw Curvature Radius and Distance from Center Data onto the Original Image" in the project notebook. A polygon is generated based on plots of the left and right fits, warped back to the perspective of the original image using the inverse perspective matrix `Minv` and overlaid onto the original image. The image below is an example of the results of the `draw_lane` function:
 
 ![alt text][im13]
 
@@ -159,14 +154,10 @@ Here's a [link to my video result](./project_video_output.mp4)
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-The problems I encountered were almost exclusively due to lighting conditions, shadows, discoloration, etc. It wasn't difficult to dial in threshold parameters to get the pipeline to perform well on the original project video (particularly after discovering the B channel of the LAB colorspace, which isolates the yellow lines very well), even on the lighter-gray bridge sections that comprised the most difficult sections of the video. It was trying to extend the same pipeline to the challenge video that presented the greatest (ahem) challenge. The lane lines don't necessarily occupy the same pixel value (speaking of the L channel of the HLS color space) range on this video that they occupy on the first video, so the normalization/scaling technique helped here quite a bit, although it also tended to create problems (large noisy areas activated in the binary image) when the white lines didn't contrast with the rest of the image enough.  This would definitely be an issue in snow or in a situation where, for example, a bright white car were driving among dull white lane lines. Producing a pipeline from which lane lines can reliably be identified was of utmost importance (garbage in, garbage out - as they say), but smoothing the video output by averaging the last `n` found good fits also helped. My approach also invalidates fits if the left and right base points aren't a certain distance apart (within some tolerance) under the assumption that the lane width will remain relatively constant. 
+I encountered problems isolating the white and yellow lines,specifically with the noise in the binary image. Having the maximum normalized to 255 and cutoff for the LAB B threshold as 175 helped stabilise the outcome for the project video's lighting conditions. However, I am afraid this won't work well on other situations. I also did not use any gradient thresholds or dynamic thresholding in my pipeline, however I hope to revisit this in future so that the pipeline is more robust to different kinds of roads.
 
-I've considered a few possible approaches for making my algorithm more robust. These include more dynamic thresholding (perhaps considering separate threshold parameters for different horizontal slices of the image, or dynamically selecting threshold parameters based on the resulting number of activated pixels), designating a confidence level for fits and rejecting new fits that deviate beyond a certain amount (this is already implemented in a relatively unsophisticated way) or rejecting the right fit (for example) if the confidence in the left fit is high and right fit deviates too much (enforcing roughly parallel fits). I hope to revisit some of these strategies in the future.
+For the perspective transform, I used hardcoded metrices for source and destination assuming the road is flat as in the project video. However, in case of elevation, this fails remarkably as tested on the challenge videos. Hence it would be more robust to determine the src and dst metrices dynamically. 
+I also think that using more than 10 sliding windows in sliding_window_polyfit function might work better for sharp turns like that of the challenge videos.
 
-*Addendum: Below are diagnostic versions of the output for each of the videos included in the project.*
 
-[Project video - diagnostic version](./project_video_output_diag.mp4)
-
-[Challenge video - diagnostic version](./challenge_video_output_diag.mp4)
-
-[Harder challenge video - diagnostic version](./harder_challenge_video_output_diag.mp4)
+For Visualisation tools and tricks, I referred to udacity carnd forums and my cohort's facebook group discussions.
